@@ -1,5 +1,29 @@
+import json
+import os
 import random
 import streamlit as st
+
+# FEATURE: High Score tracker and Guess History visualizer
+# Agent planned and implemented both features in one pass:
+#   - load_high_scores / save_high_score persist best scores per difficulty to highscores.json
+#   - Guess History sidebar renders a bar chart showing how far each guess was from the secret
+
+HIGH_SCORES_FILE = "highscores.json"
+
+def load_high_scores():
+    """Load high scores from disk. Returns a dict keyed by difficulty."""
+    if os.path.exists(HIGH_SCORES_FILE):
+        with open(HIGH_SCORES_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+def save_high_score(difficulty: str, score: int):
+    """Save score if it beats the existing high score for this difficulty."""
+    scores = load_high_scores()
+    if score > scores.get(difficulty, 0):
+        scores[difficulty] = score
+        with open(HIGH_SCORES_FILE, "w") as f:
+            json.dump(scores, f)
 
 def get_range_for_difficulty(difficulty: str):
     if difficulty == "Easy":
@@ -97,6 +121,15 @@ low, high = get_range_for_difficulty(difficulty)
 st.sidebar.caption(f"Range: {low} to {high}")
 st.sidebar.caption(f"Attempts allowed: {attempt_limit}")
 
+# FEATURE: Show high scores per difficulty in the sidebar
+# Agent added this block to display persisted best scores next to the settings.
+st.sidebar.divider()
+st.sidebar.header("🏆 High Scores")
+high_scores = load_high_scores()
+for diff in ["Easy", "Normal", "Hard"]:
+    best = high_scores.get(diff, 0)
+    st.sidebar.caption(f"{diff}: {best}")
+
 if "secret" not in st.session_state:
     st.session_state.secret = random.randint(low, high)
 
@@ -190,6 +223,9 @@ if submit:
         if outcome == "Win":
             st.balloons()
             st.session_state.status = "won"
+            # FEATURE: Save high score on win; agent added this call so every win
+            # is compared against the persisted best for this difficulty.
+            save_high_score(difficulty, st.session_state.score)
             st.success(
                 f"You won! The secret was {st.session_state.secret}. "
                 f"Final score: {st.session_state.score}"
@@ -202,6 +238,22 @@ if submit:
                     f"The secret was {st.session_state.secret}. "
                     f"Score: {st.session_state.score}"
                 )
+
+# FEATURE: Guess History visualizer
+# Agent designed this section to render a bar chart in the sidebar showing
+# how far each valid guess was from the secret, so the player can see their
+# progression at a glance. Only shown once at least one valid guess exists.
+valid_guesses = [g for g in st.session_state.history if isinstance(g, int)]
+if valid_guesses:
+    st.divider()
+    st.subheader("📊 Guess History")
+    secret = st.session_state.secret
+    data = {
+        "Guess": valid_guesses,
+        "Distance from secret": [abs(g - secret) for g in valid_guesses],
+    }
+    st.bar_chart(data, x="Guess", y="Distance from secret")
+    st.caption("Lower bar = closer to the secret number.")
 
 st.divider()
 st.caption("Built by an AI that claims this code is production-ready.")

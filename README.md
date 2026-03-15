@@ -53,6 +53,18 @@ Glitchy Guesser is a number guessing game built with Streamlit. The player picks
 7. **Attempt counter on invalid input** — moved `st.session_state.attempts += 1` inside the `else` branch so it only increments on valid guesses.
 8. **Secret type alternating** — removed the even/odd `str()` conversion; `secret` is always used as an integer.
 
+### Stretch Features
+
+#### 🏆 High Score Tracker
+A persistent high score system that saves your best score per difficulty to `highscores.json`. After every win, the score is compared against the saved best and updated if it's higher. High scores are displayed in the sidebar so you can track your personal bests across sessions.
+
+**How the agent contributed:** The agent planned both features together, identified that `json` and `os` were the right stdlib tools (no extra dependencies), and placed the `load_high_scores` / `save_high_score` functions alongside the other logic functions at the top of the file for consistency. It also added the sidebar display block and the `save_high_score` call inside the win branch.
+
+#### 📊 Guess History Visualizer
+After each valid guess, a bar chart appears below the game showing every guess on the x-axis and its distance from the secret number on the y-axis. Shorter bars mean closer guesses, so you can see your progression at a glance.
+
+**How the agent contributed:** The agent chose `st.bar_chart` as the simplest Streamlit-native chart, filtered `history` to exclude invalid string entries, and computed the distance as `abs(guess - secret)` for an intuitive "closeness" metric.
+
 ### Pytest Results
 
 All 16 tests pass after the fixes were applied. Run them yourself with:
