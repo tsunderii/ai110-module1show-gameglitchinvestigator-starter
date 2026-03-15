@@ -87,6 +87,8 @@ test_app.py::test_parse_guess_non_numeric PASSED                         [100%]
 
 ============================== 16 passed in 0.01s ==============================
 ```
+## Pytest Output:
+![alt text](<Screenshot 2026-03-15 at 12.52.36 PM.png>)
 
 ### How AI Helped Orchestrate the Changes
 
