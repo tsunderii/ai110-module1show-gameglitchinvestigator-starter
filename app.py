@@ -6,8 +6,10 @@ def get_range_for_difficulty(difficulty: str):
         return 1, 20
     if difficulty == "Normal":
         return 1, 100
+    # FIX: Hard was 1-50 (easier than Normal). AI identified the range was backwards;
+    # collaborated to change it to 1-200 so Hard is genuinely harder than Normal.
     if difficulty == "Hard":
-        return 1, 50
+        return 1, 200
     return 1, 100
 
 
@@ -33,30 +35,36 @@ def check_guess(guess, secret):
     if guess == secret:
         return "Win", "🎉 Correct!"
 
+    # FIX: Hints were swapped — "Too High" said "Go HIGHER" and vice versa.
+    # AI traced the mismatch between outcome label and hint text; swapped both
+    # branches here and in the TypeError fallback below.
     try:
         if guess > secret:
-            return "Too High", "📈 Go HIGHER!"
+            return "Too High", "📉 Go LOWER!"
         else:
-            return "Too Low", "📉 Go LOWER!"
+            return "Too Low", "📈 Go HIGHER!"
     except TypeError:
         g = str(guess)
         if g == secret:
             return "Win", "🎉 Correct!"
         if g > secret:
-            return "Too High", "📈 Go HIGHER!"
-        return "Too Low", "📉 Go LOWER!"
-
+            return "Too High", "📉 Go LOWER!"
+        return "Too Low", "📈 Go HIGHER!"
 
 def update_score(current_score: int, outcome: str, attempt_number: int):
     if outcome == "Win":
-        points = 100 - 10 * (attempt_number + 1)
+        # FIX: Formula had `attempt_number + 1`, making first-try give 70 instead of 90.
+        # AI traced attempt_number=1 on first guess through the old formula to find the off-by-one;
+        # removed the +1 so first try correctly awards 90 points.
+        points = 100 - 10 * attempt_number
         if points < 10:
             points = 10
         return current_score + points
 
+    # FIX: "Too High" on even attempts added +5 instead of subtracting.
+    # AI spotted the stray `attempt_number % 2 == 0` branch that rewarded wrong guesses;
+    # removed it so both wrong outcomes always subtract 5.
     if outcome == "Too High":
-        if attempt_number % 2 == 0:
-            return current_score + 5
         return current_score - 5
 
     if outcome == "Too Low":
@@ -92,8 +100,10 @@ st.sidebar.caption(f"Attempts allowed: {attempt_limit}")
 if "secret" not in st.session_state:
     st.session_state.secret = random.randint(low, high)
 
+# FIX: attempts was initialised to 1, causing the first guess to pass attempt_number=2.
+# AI caught this while tracing the score bug; changed to 0 so the first valid guess gives attempt_number=1.
 if "attempts" not in st.session_state:
-    st.session_state.attempts = 1
+    st.session_state.attempts = 0
 
 if "score" not in st.session_state:
     st.session_state.score = 0
@@ -106,8 +116,10 @@ if "history" not in st.session_state:
 
 st.subheader("Make a guess")
 
+# FIX: Info text hardcoded "between 1 and 100" regardless of difficulty.
+# AI noticed the f-string used a literal instead of the low/high variables; updated to use them.
 st.info(
-    f"Guess a number between 1 and 100. "
+    f"Guess a number between {low} and {high}. "
     f"Attempts left: {attempt_limit - st.session_state.attempts}"
 )
 
@@ -131,9 +143,14 @@ with col2:
 with col3:
     show_hint = st.checkbox("Show hint", value=True)
 
+# FIX: New game button used hardcoded randint(1,100) and didn't reset score, status, or history.
+# AI identified all missing resets and replaced the hardcoded range with randint(low, high).
 if new_game:
     st.session_state.attempts = 0
-    st.session_state.secret = random.randint(1, 100)
+    st.session_state.secret = random.randint(low, high)
+    st.session_state.score = 0
+    st.session_state.status = "playing"
+    st.session_state.history = []
     st.success("New game started.")
     st.rerun()
 
@@ -145,20 +162,19 @@ if st.session_state.status != "playing":
     st.stop()
 
 if submit:
-    st.session_state.attempts += 1
-
     ok, guess_int, err = parse_guess(raw_guess)
 
     if not ok:
         st.session_state.history.append(raw_guess)
         st.error(err)
     else:
+        # FIX: attempts incremented before parse_guess, so invalid input wasted an attempt.
+        # AI moved the increment inside the else branch so only valid guesses count.
+        st.session_state.attempts += 1
         st.session_state.history.append(guess_int)
-
-        if st.session_state.attempts % 2 == 0:
-            secret = str(st.session_state.secret)
-        else:
-            secret = st.session_state.secret
+        # FIX: secret was cast to str on even attempts, causing wrong lexicographic comparisons.
+        # AI traced the alternating int/str type bug and removed the conversion so secret is always an integer.
+        secret = st.session_state.secret
 
         outcome, message = check_guess(guess_int, secret)
 
