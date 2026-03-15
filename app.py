@@ -1,100 +1,17 @@
-import json
-import os
 import random
 import streamlit as st
 
-# FEATURE: High Score tracker and Guess History visualizer
-# Agent planned and implemented both features in one pass:
-#   - load_high_scores / save_high_score persist best scores per difficulty to highscores.json
-#   - Guess History sidebar renders a bar chart showing how far each guess was from the secret
-
-HIGH_SCORES_FILE = "highscores.json"
-
-def load_high_scores():
-    """Load high scores from disk. Returns a dict keyed by difficulty."""
-    if os.path.exists(HIGH_SCORES_FILE):
-        with open(HIGH_SCORES_FILE, "r") as f:
-            return json.load(f)
-    return {}
-
-def save_high_score(difficulty: str, score: int):
-    """Save score if it beats the existing high score for this difficulty."""
-    scores = load_high_scores()
-    if score > scores.get(difficulty, 0):
-        scores[difficulty] = score
-        with open(HIGH_SCORES_FILE, "w") as f:
-            json.dump(scores, f)
-
-def get_range_for_difficulty(difficulty: str):
-    if difficulty == "Easy":
-        return 1, 20
-    if difficulty == "Normal":
-        return 1, 100
-    # FIX: Hard was 1-50 (easier than Normal). AI identified the range was backwards;
-    # collaborated to change it to 1-200 so Hard is genuinely harder than Normal.
-    if difficulty == "Hard":
-        return 1, 200
-    return 1, 100
-
-
-def parse_guess(raw: str):
-    if raw is None:
-        return False, None, "Enter a guess."
-
-    if raw == "":
-        return False, None, "Enter a guess."
-
-    try:
-        if "." in raw:
-            value = int(float(raw))
-        else:
-            value = int(raw)
-    except Exception:
-        return False, None, "That is not a number."
-
-    return True, value, None
-
-
-def check_guess(guess, secret):
-    if guess == secret:
-        return "Win", "🎉 Correct!"
-
-    # FIX: Hints were swapped — "Too High" said "Go HIGHER" and vice versa.
-    # AI traced the mismatch between outcome label and hint text; swapped both
-    # branches here and in the TypeError fallback below.
-    try:
-        if guess > secret:
-            return "Too High", "📉 Go LOWER!"
-        else:
-            return "Too Low", "📈 Go HIGHER!"
-    except TypeError:
-        g = str(guess)
-        if g == secret:
-            return "Win", "🎉 Correct!"
-        if g > secret:
-            return "Too High", "📉 Go LOWER!"
-        return "Too Low", "📈 Go HIGHER!"
-
-def update_score(current_score: int, outcome: str, attempt_number: int):
-    if outcome == "Win":
-        # FIX: Formula had `attempt_number + 1`, making first-try give 70 instead of 90.
-        # AI traced attempt_number=1 on first guess through the old formula to find the off-by-one;
-        # removed the +1 so first try correctly awards 90 points.
-        points = 100 - 10 * attempt_number
-        if points < 10:
-            points = 10
-        return current_score + points
-
-    # FIX: "Too High" on even attempts added +5 instead of subtracting.
-    # AI spotted the stray `attempt_number % 2 == 0` branch that rewarded wrong guesses;
-    # removed it so both wrong outcomes always subtract 5.
-    if outcome == "Too High":
-        return current_score - 5
-
-    if outcome == "Too Low":
-        return current_score - 5
-
-    return current_score
+# Agent refactored all pure logic functions into logic_utils.py with full
+# PEP 257 docstrings and type annotations, then updated this import so app.py
+# stays focused on UI concerns only.
+from logic_utils import (
+    check_guess,
+    get_range_for_difficulty,
+    load_high_scores,
+    parse_guess,
+    save_high_score,
+    update_score,
+)
 
 st.set_page_config(page_title="Glitchy Guesser", page_icon="🎮")
 
